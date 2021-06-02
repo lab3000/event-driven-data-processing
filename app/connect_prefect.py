@@ -5,47 +5,43 @@ from json import loads
 from prefect import task, Flow
 from prefect.tasks.shell import ShellTask
 
-# prefect_api_key = loads(sys.stdin.read())
-# print('type(prefect_api_key) = ', type(prefect_api_key))
-# print('prefect_api_key = ', prefect_api_key)
-
-# print(prefect_api_key['prefect-api-key1'])
-
-aws_get_secret = ShellTask()
-prefect_login = ShellTask()
-create_token = ShellTask()
-export_token = ShellTask()
-set_backend = ShellTask()
+shell_task = ShellTask(return_all=True,log_stderr=True,stream_output='DEBUG')
 
 @task
 def get_login_str(response):
-    api_key = loads(response)['prefect-api-key1']
+    api_key = loads(response[0])["prefect-api-key1"]
     return 'prefect auth login -t '+api_key
 
 @task
-def create_export_str(token):
-    return 'export PREFECT__CLOUD__AGENT__AUTH_TOKEN='+token
+def create_start_str(token):
+    print('token[0] = ',token[0])
+    return 'prefect agent start -t '+token[0]
 
 @task
 def print_rslt(r):
     print(r)
 
-with Flow('connect_prefect') as f:
-    cli_str = 'aws secretsmanager get-secret-value --secret-id'
-    cli_str = cli_str+' dev/event-driven/prefect1 --query SecretString --output text'
-    secr_mng_response = aws_get_secret(command=cli_str)
+with Flow('connect_prefect1') as f:
+    cli_str = 'aws secretsmanager get-secret-value --secret-id  dev/event-driven/prefect1'
+    cli_str = cli_str+' --query SecretString --output text --region us-west-2'
+    secr_mng_response = shell_task(command=cli_str)
 
     login_str = get_login_str(secr_mng_response)
-    login_response = prefect_login(command=login_str)
+    login_response = shell_task(command=login_str)
     print_rslt(login_response)
 
     token_str = 'prefect auth create-token -n my-runner-token -s RUNNER'
-    runner_token = create_token(command=token_str)
-    export_str = create_export_str(runner_token)
-    export_token(command=export_token)
+    runner_token = shell_task(command=token_str)
+    runner_token.set_upstream(login_response)
 
-    set_backend(command='prefect backend cloud')
+    set_backend = shell_task(command='prefect backend cloud')
+    set_backend.set_upstream(runner_token)
 
-f.set_dependencies(task=create_token,upstream_tasks=[prefect_login])
-f.set_dependencies(task=set_backend,upstream_tasks=[export_token])
+    register_flow = shell_task(command='python ./example_flow.py')
+    register_flow.set_upstream(set_backend)
+
+    start_str = create_start_str(runner_token)
+    start_agent = shell_task(command=start_str) 
+    start_agent.set_upstream(register_flow)
+
 f.run()

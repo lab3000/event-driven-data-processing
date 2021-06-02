@@ -4,13 +4,17 @@ RUN mkdir /app
 
 COPY /app /app
 COPY pyproject.toml /app
+COPY poetry.lock /app
 
 WORKDIR /app
 ENV PYTHONPATH=${PYTHONPATH}:${PWD}
 
-RUN pip3 install poetry
+RUN pip3 install poetry==1.1.6
 RUN poetry config virtualenvs.create false
 RUN poetry install --no-dev
 
-RUN chmod +x ./connect_prefect.py
-RUN poetry run ./connect_prefect.py
+#RUN poetry run python ./connect_prefect.py
+#CMD ["python","example_flow.py"]
+#CMD ["python","connect_prefect.py"]
+
+ENTRYPOINT python ./connect_prefect.py

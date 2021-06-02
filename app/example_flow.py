@@ -4,7 +4,7 @@ import datetime
 import random
 from time import sleep
 from prefect.run_configs import LocalRun
-from prefect.engine.executors import LocalDaskExecutor
+from prefect.executors import LocalDaskExecutor
 
 @task
 def inc(x):
