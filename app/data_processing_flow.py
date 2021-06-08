@@ -1,7 +1,8 @@
 import os
 import boto3
 import prefect
-from prefect import task, Flow
+import pandas as pd
+from prefect import task, Flow, Parameter
 from prefect.run_configs import LocalRun
 from prefect.executors import LocalDaskExecutor
 
@@ -9,9 +10,9 @@ from prefect.executors import LocalDaskExecutor
 @task
 def extract(bucket, src_filename):
     s3_client = boto3.client('s3')
-    s3_client.download_file(bucket, src_filename)
+    s3_client.download_file(bucket, src_filename, src_filename)
     df = pd.read_csv(src_filename)
-    return df, src_filename
+    return df
 
 
 @task
@@ -23,14 +24,14 @@ def transform(df, src_filename):
 
 
 @task
-def load(bucket, src_filename, dest_filename):
+def load(dest_filename, bucket, src_filename):
     s3_client = boto3.client('s3')
     s3_client.upload_file(Filename=dest_filename,
                           Bucket=bucket, Key=dest_filename)
 
 
 @task
-def cleanup(src_filename, dest_filename):
+def cleanup(dest_filename, src_filename):
     os.remove(src_filename)
     os.remove(dest_filename)
 
@@ -39,7 +40,13 @@ with Flow('processing-etl',
           executor=LocalDaskExecutor(),
           run_config=LocalRun()) as flow:
     # parameters passed in via API call -- set with defaults here
-    extract_result = extract(param_bucket, param_src_flnm)
-    transform_result = transform(extract_result)
-    load_result = load(transform_result)
-    cleanup_result = cleanup(load_result)
+    src_bucket = Parameter('src_bucket', default='eddp-src')
+    src_filename = Parameter('src_filename', default='df_src.csv')
+    extract_result = extract(src_bucket, src_filename)
+    transform_result = transform(extract_result, src_filename)
+    load_result = load(transform_result, src_bucket, src_filename)
+
+    cleanup_result = cleanup(transform_result, src_filename)
+    cleanup_result.set_upstream(load_result)
+
+flow.run()

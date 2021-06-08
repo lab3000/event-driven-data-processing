@@ -11,12 +11,12 @@ PREFECT__CLOUD__AUTH_TOKEN = prefect_settings['api_token']
 
 def api_call():
     query_ = '''
-    query {
-        flow { 
-            name 
-            id
-        }
-    }
+    {
+    flow (where: {name: {_eq: "getting-started-example"}}){
+        name
+        id
+  }
+}
     '''
 
     data = json.dumps(dict(query=query_)).encode('utf-8')
@@ -32,4 +32,6 @@ def api_call():
     return json.loads(resp.read().decode())
 
 if __name__=='__main__':
-    print(api_call())
+    response = api_call()
+    print('type(response)',type(response))
+    print("response['data']['flow'][0]['id']", response['data']['flow'][0]['id'])
