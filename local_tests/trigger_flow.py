@@ -1,7 +1,7 @@
+import sys
 import json
 import toml
 import os
-import pandas as pd
 import urllib.parse
 import urllib.request
 from os.path import expanduser as eu
@@ -9,19 +9,25 @@ from os.path import expanduser as eu
 prefect_settings = toml.load(eu('~/.prefect/client/https-api.prefect.io-graphql/settings.toml')) 
 PREFECT__CLOUD__API = 'https://api.prefect.io/'
 PREFECT__CLOUD__AUTH_TOKEN = prefect_settings['api_token'] 
+PREFECT__FLOW_ID = sys.argv[1]
 
 def api_call():
-    query_ = '''
-    {
-    flow (where: {name: {_eq: "getting-started-example"}}){
-        name
-        id
-        version
-  }
-}
-    '''
+    create_mutation = """
+    mutation($input: createFlowRunInput!){
+        createFlowRun(input: $input){
+            flow_run{
+                id
+            }
+        }
+    }
+    """
 
-    data = json.dumps(dict(query=query_)).encode('utf-8')
+    inputs = dict(flowId=PREFECT__FLOW_ID)
+
+    variables = dict(input=inputs)
+    data = json.dumps(
+        dict(query=create_mutation, variables=json.dumps(variables))
+    ).encode("utf-8")
 
     ## prep the request
     req = urllib.request.Request(PREFECT__CLOUD__API, data=data)
@@ -35,13 +41,4 @@ def api_call():
 
 if __name__=='__main__':
     response = api_call()
-    print('full response:')
     print(response)
-    print('-----')
-    # take the last entry of the latest version
-    flows_df = pd.DataFrame(response['data']['flow'])
-    print(flows_df)
-    print('-----')
-    max_ver = flows_df['version'].max()
-    id = flows_df.query('version==@max_ver')['id'].iloc[0]
-    print("prefect flowId: ", id)

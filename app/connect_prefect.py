@@ -14,7 +14,6 @@ def get_login_str(response):
 
 @task
 def create_start_str(token):
-    print('token[0] = ',token[0])
     return 'prefect agent start -t '+token[0]
 
 @task

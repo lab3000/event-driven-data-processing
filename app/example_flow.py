@@ -30,9 +30,10 @@ def list_sum(arr):
 with Flow('getting-started-example',
           executor=LocalDaskExecutor(),
           run_config=LocalRun()) as flow:
-  incs = inc.map(x=range(10))
-  decs = dec.map(x=range(10))
+  incs = inc.map(x=range(3))
+  decs = dec.map(x=range(3))
   adds = add.map(incs, decs)
   total = list_sum(adds)
-  
-flow.register(project_name = 'event-driven-data-processing')
+
+print(flow.serialized_hash())
+flow.register(project_name = 'event-driven-data-processing', idempotency_key=flow.serialized_hash())
