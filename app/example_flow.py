@@ -36,4 +36,4 @@ with Flow('getting-started-example',
   total = list_sum(adds)
 
 print(flow.serialized_hash())
-flow.register(project_name = 'event-driven-data-processing', idempotency_key=flow.serialized_hash())
+flow.register(project_name = 'event-driven-data-processing') #, idempotency_key=flow.serialized_hash())
