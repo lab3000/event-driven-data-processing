@@ -13,8 +13,4 @@ RUN pip3 install poetry==1.1.6
 RUN poetry config virtualenvs.create false
 RUN poetry install --no-dev
 
-#RUN poetry run python ./connect_prefect.py
-#CMD ["python","example_flow.py"]
-#CMD ["python","connect_prefect.py"]
-
 ENTRYPOINT python ./connect_prefect.py

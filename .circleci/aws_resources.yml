@@ -1,0 +1,77 @@
+Description: >
+  event-driven-data-processing test1
+  
+Parameters:
+  ID:
+    Description: Unique identifier.
+    Type: String
+
+Resources:
+
+  ECRfullAcessEC2:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName:
+        !Sub ${ID}-Role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+              - ec2.amazonaws.com
+            Action:
+            - sts:AssumeRole
+      Path: "/"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/SecretsManagerReadWrite      
+  
+  InstanceProfileWithRole:
+    Type: AWS::IAM::InstanceProfile
+    Properties: 
+      Roles:
+        - !Ref ECRfullAcessEC2
+      Path:  "/"
+
+  RolePolicies:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: ECRfullAccess
+      PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - ecr:*
+            Resource: "*"
+      Roles:
+        - Ref: ECRfullAcessEC2
+            
+  InstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: eddp-test1 # !Sub UdaPeople-${ID}
+      GroupDescription: Allow port 22 for ssh.
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+
+  EC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t2.micro
+      SecurityGroups:
+        - Ref: InstanceSecurityGroup
+      IamInstanceProfile: !Ref InstanceProfileWithRole
+      KeyName: eddp # If you use another key pair name, you should change this value to match.
+      ImageId: ami-064803387adcb64b3 # https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs-optimized_AMI.html
+      Tags:
+        - Key: Name
+          Value: eddp-test1_EC2tag1 # !Sub backend-${ID}
+
+Outputs:
+  PublicIP:
+    Description: EC2 instance PublicIP Address
+    Value: !GetAtt EC2Instance.PublicIp

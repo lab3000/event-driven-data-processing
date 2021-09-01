@@ -7,7 +7,7 @@ authors = ["lab3000 <lbawa1@galvanizeu.newhaven.edu>"]
 [tool.poetry.dependencies]
 python = "^3.8"
 awscli = "^1.19.69"
-prefect = {extras = ["aws", "viz"], version = "^0.14.17"}
+prefect = {extras = ["kubernetes", "aws"], version = "^0.15.3"}
 boto3 = "^1.17.84"
 toml = "^0.10.2"
 pandas = "^1.2.4"
