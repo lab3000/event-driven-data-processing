@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-import sys
 from json import loads
 from prefect import task, Flow
 from prefect.tasks.shell import ShellTask
