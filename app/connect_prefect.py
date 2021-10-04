@@ -12,8 +12,8 @@ def get_login_str(response):
     return 'prefect auth login -t '+api_key
 
 @task(log_stdout=True)
-def create_start_str(token):
-    return 'prefect agent start -t '+token[0]
+def create_agent_install_str(token):
+    return 'prefect agent install kubernetes -t '+token[0]
 
 @task(log_stdout=True)
 def print_rslt(r):
@@ -41,8 +41,8 @@ with Flow('connect_prefect1') as f:
     register_flow = shell_task(command='python ./example_flow.py', task_args=dict(name='shell: register flow',log_stdout=True)) #'prefect register --path ./example_flow.py --project event-driven-data-processing --force', task_args=dict(name='shell: register flow'))
     register_flow.set_upstream(set_backend)
 
-    start_str = create_start_str(runner_token)
-    start_agent = shell_task(command=start_str, task_args=dict(name='shell: prefect agent start',log_stdout=True)) 
+    start_str = create_agent_install_str(runner_token)
+    start_agent = shell_task(command=start_str, task_args=dict(name='shell: prefect agent install',log_stdout=True)) 
     start_agent.set_upstream(register_flow)
 
 f.run()
