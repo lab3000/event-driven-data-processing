@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 from json import loads
 from prefect import task, Flow
 from prefect.tasks.shell import ShellTask
@@ -9,11 +7,13 @@ shell_task = ShellTask(return_all=True,log_stderr=True,stream_output='DEBUG')
 @task(log_stdout=True)
 def get_login_str(response):
     api_key = loads(response[0])["prefect-api-key1"]
-    return 'prefect auth login -t '+api_key
+    return 'prefect auth login --key '+api_key
 
 @task(log_stdout=True)
 def create_agent_install_str(token):
-    return 'prefect agent install kubernetes -t '+token[0]
+    str_ = 'prefect agent kubernetes install -t '+token[1]+' --rbac | kubectl apply -f -'
+    print(str_)
+    return str_
 
 @task(log_stdout=True)
 def print_rslt(r):
