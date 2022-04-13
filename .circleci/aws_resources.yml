@@ -6,9 +6,19 @@ Parameters:
     Description: Unique identifier.
     Type: String
 
+  SubnetId:
+    Description: Subnet in which to launch an EC2
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Subnet>
+
+  VpcId:
+    Type: String
+    Description: VPC id
+    Default: AWS::SSM::Parameter::Value<AWS::EC2::VPC>
+
+
 Resources:
 
-  ECRfullAcessEC2:
+  eddpRole:
     Type: AWS::IAM::Role
     Properties:
       RoleName:
@@ -20,37 +30,124 @@ Resources:
             Principal:
               Service:
               - ec2.amazonaws.com
+              - eks.amazonaws.com
             Action:
-            - sts:AssumeRole
+            - sts:AssumeRole 
       Path: "/"
       ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/SecretsManagerReadWrite      
-  
+        - arn:aws:iam::aws:policy/SecretsManagerReadWrite
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess
+        - arn:aws:iam::aws:policy/AmazonEC2FullAccess
+        - arn:aws:iam::aws:policy/AWSCloudFormationFullAccess
+        - !Ref S3Policy
+        - !Ref EksAllAccess
+        - !Ref IamLimitedAccess      
+
   InstanceProfileWithRole:
     Type: AWS::IAM::InstanceProfile
     Properties: 
       Roles:
-        - !Ref ECRfullAcessEC2
+        - !Ref eddpRole
       Path:  "/"
 
-  RolePolicies:
-    Type: AWS::IAM::Policy
+  S3Policy:
+    Type: AWS::IAM::ManagedPolicy
     Properties:
-      PolicyName: ECRfullAccess
       PolicyDocument:
           Version: '2012-10-17'
           Statement:
           - Effect: Allow
-            Action:
-            - ecr:*
-            Resource: "*"
-      Roles:
-        - Ref: ECRfullAcessEC2
-            
+            Action: 
+            - s3:Get*
+            - s3:List*
+            Resource:
+            - arn:aws:s3:::eddp-ec2-startup
+            - arn:aws:s3:::eddp-ec2-startup/*
+
+  EksAllAccess:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action: 
+            - eks:*
+            Resource:
+            - "*"
+          - Effect: Allow
+            Action: 
+            - ssm:GetParameter
+            - ssm:GetParameters
+            Resource:
+            - !Sub arn:aws:ssm:*:${AWS::AccountId}:parameter/aws/*
+            - arn:aws:ssm:*::parameter/aws/*
+          - Effect: Allow
+            Action: 
+            - kms:CreateGrant
+            - kms:DescribeKey
+            Resource:
+            - "*"
+  
+  # reference: https://github.com/weaveworks/eksctl/blob/main/userdocs/src/usage/minimum-iam-policies.md
+  IamLimitedAccess:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action: 
+            - iam:CreateInstanceProfile
+            - iam:DeleteInstanceProfile
+            - iam:GetInstanceProfile
+            - iam:RemoveRoleFromInstanceProfile
+            - iam:GetRole
+            - iam:CreateRole
+            - iam:DeleteRole
+            - iam:AttachRolePolicy
+            - iam:PutRolePolicy
+            - iam:ListInstanceProfiles
+            - iam:AddRoleToInstanceProfile
+            - iam:ListInstanceProfilesForRole
+            - iam:PassRole
+            - iam:DetachRolePolicy
+            - iam:DeleteRolePolicy
+            - iam:GetRolePolicy
+            - iam:GetOpenIDConnectProvider
+            - iam:CreateOpenIDConnectProvider
+            - iam:DeleteOpenIDConnectProvider
+            - iam:TagOpenIDConnectProvider                
+            - iam:ListAttachedRolePolicies
+            - iam:TagRole
+            Resource:
+            - !Sub arn:aws:iam::${AWS::AccountId}:instance-profile/eksctl-*
+            - !Sub arn:aws:iam::${AWS::AccountId}:role/eksctl-*
+            - !Sub arn:aws:iam::${AWS::AccountId}:oidc-provider/*
+            - !Sub arn:aws:iam::${AWS::AccountId}:role/aws-service-role/eks-nodegroup.amazonaws.com/AWSServiceRoleForAmazonEKSNodegroup
+            - !Sub arn:aws:iam::${AWS::AccountId}:role/eksctl-managed-*
+          - Effect: Allow
+            Action: 
+            - iam:GetRole
+            Resource:
+            - !Sub arn:aws:iam::${AWS::AccountId}:role/*
+          - Effect: Allow
+            Action: 
+            - iam:CreateServiceLinkedRole
+            Resource:
+            - "*"
+            Condition:
+              StringEquals:
+                iam:AWSServiceName:
+                - eks.amazonaws.com
+                - eks-nodegroup.amazonaws.com
+                - eks-fargate.amazonaws.com
+         
   InstanceSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupName: eddp-test1 # !Sub UdaPeople-${ID}
+      VpcId: !Ref VpcId
+      # GroupName: eddp-test1 # !Sub UdaPeople-${ID}
       GroupDescription: Allow port 22 for ssh.
       SecurityGroupIngress:
         - IpProtocol: tcp
@@ -62,14 +159,40 @@ Resources:
     Type: AWS::EC2::Instance
     Properties:
       InstanceType: t2.micro
-      SecurityGroups:
+      SecurityGroupIds:
         - Ref: InstanceSecurityGroup
       IamInstanceProfile: !Ref InstanceProfileWithRole
-      KeyName: eddp # If you use another key pair name, you should change this value to match.
-      ImageId: ami-064803387adcb64b3 # https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs-optimized_AMI.html
+      KeyName: eddp_west1 # If you use another key pair name, you should change this value to match.
+      ImageId: ami-0bc32f414af8badcb # https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs-optimized_AMI.html
+      SubnetId: !Ref SubnetId
       Tags:
         - Key: Name
-          Value: eddp-test1_EC2tag1 # !Sub backend-${ID}
+          Value: !Sub eddp-${ID}
+      UserData:
+        Fn::Base64:
+          !Sub |
+            #!/bin/bash -xe
+            sudo yum install -y awscli
+            export AWS_DEFAULT_REGION=us-west-1
+            curl -o kubectl https://amazon-eks.s3.us-west-2.amazonaws.com/1.21.2/2021-07-05/bin/linux/amd64/kubectl
+            chmod +x ./kubectl
+            mkdir -p $HOME/bin && cp ./kubectl $HOME/bin/kubectl && export PATH=$PATH:$HOME/bin && echo 'export PATH=$PATH:$HOME/bin' >> ~/.bashrc
+            sudo amazon-linux-extras install python3.8 -y
+            sudo pip3 install poetry==1.1.6
+            sudo pip3 install prefect==1.2.0
+            sudo pip3 install pandas
+            cd /home/ec2-user/
+            sudo aws s3 cp s3://eddp-ec2-startup/poetry.lock poetry.lock
+            sudo aws s3 cp s3://eddp-ec2-startup/pyproject.toml pyproject.toml
+            sudo aws s3 cp s3://eddp-ec2-startup/start_nr_eks.py start_nr_eks.py
+            sudo aws s3 cp s3://eddp-ec2-startup/connect_prefect.py connect_prefect.py
+            sudo aws s3 cp s3://eddp-ec2-startup/shutdown_eks.py shutdown_eks.py
+            sudo aws s3 cp s3://eddp-ec2-startup/example_flow.py example_flow.py
+            poetry install
+            sudo python3 start_nr_eks.py
+            eksctl create cluster --name fargate-eks --region us-west-1 --fargate &
+            poetry run python3 connect_prefect.py
+            
 
 Outputs:
   PublicIP:

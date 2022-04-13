@@ -1,0 +1,42 @@
+version: 2.1
+jobs:
+  build:
+    docker:
+      - image: python:3.7.3-stretch
+    
+    steps:
+      - checkout
+
+      - run:
+          name: install dependencies
+          command: |
+            pip install awscli
+            pip install pylint
+
+      - run:
+          name: run lint
+          command: |
+            pylint --disable=R,C,W1203 ./manage_infra/connect_prefect.py
+      
+      - run:
+          name: copy files to S3
+          command: |
+            aws s3 cp poetry.lock s3://eddp-ec2-startup
+            aws s3 cp pyproject.toml s3://eddp-ec2-startup
+            aws s3 cp ./manage_infra/connect_prefect.py s3://eddp-ec2-startup
+            aws s3 cp ./manage_infra/start_nr_eks.py s3://eddp-ec2-startup
+            aws s3 cp ./manage_infra/shutdown_eks.py s3://eddp-ec2-startup
+            aws s3 cp ./flows/example_flow.py s3://eddp-ec2-startup
+
+      - run:
+          name: deploy infra
+          command: |
+            aws cloudformation deploy \ 
+              --template-file ./circleci/aws_resources.yml 
+              --stack-name "eddp-${CIRCLE_WORKFLOW_ID:0:7}" 
+              --parameter-overrides ID="${CIRCLE_WORKFLOW_ID:0:7}" 
+              --capabilities CAPABILITY_NAMED_IAM
+
+
+
+    
