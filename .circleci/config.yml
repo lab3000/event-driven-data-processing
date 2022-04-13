@@ -11,12 +11,12 @@ jobs:
           name: install dependencies
           command: |
             pip install awscli
-            pip install pylint
+            pip install black
 
       - run:
           name: run lint
           command: |
-            pylint --disable=R,C,W1203 ./manage_infra/connect_prefect.py
+            black ./manage_infra/connect_prefect.py
       
       - run:
           name: copy files to S3
