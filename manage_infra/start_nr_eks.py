@@ -2,14 +2,14 @@ from json import loads
 from prefect import task, Flow
 from prefect.tasks.shell import ShellTask
 import pandas as pd
-from prefect.run_configs import LocalRun
-from prefect.executors import LocalDaskExecutor
+# from prefect.run_configs import LocalRun
+# from prefect.executors import LocalDaskExecutor
 
 df = pd.DataFrame({'A':[1,2,3],'B':[4,5,6]})
 
 df.to_pickle('ec2_init_df.p')
 
-shell_task = ShellTask(return_all=True, stream_output=True)
+shell_task = ShellTask(return_all=True,log_stderr=True,stream_output='DEBUG')
 
 @task(log_stdout=True)
 def make_curl_str(nr_api_key, nr_account_id):
@@ -25,9 +25,10 @@ def print_rslt(r):
     print(r)
 
 # dash executor allows parallel execution of non-dependent tasks
-with Flow('install New Relic',
-          executor=LocalDaskExecutor(),
-          run_config=LocalRun()) as f:
+with Flow('connect_prefect') as f:
+    # ,
+    #       executor=LocalDaskExecutor(),
+    #       run_config=LocalRun()) as f:
 
     cli_str0 = 'export AWS_DEFAULT_REGION=us-west-1'
     set_region = shell_task(command=cli_str0, task_args=dict(name='set AWS region',log_stdout=True))
@@ -45,34 +46,19 @@ with Flow('install New Relic',
     # nr_curl_str = make_curl_str(nr_api_key, nr_account_id)
     # nr_install = shell_task(command=nr_curl_str, task_args=dict(name='installing New Relic',log_stdout=True))
 
-    # cli_str = 'aws ecr get-login-password --region us-west-1 | docker login --username AWS '
-    # cli_str = cli_str+'--password-stdin 091442718550.dkr.ecr.us-west-1.amazonaws.com/eddp' 
-    # ecr_login = shell_task(command=cli_str, task_args=dict(name='docker pull',log_stdout=True))
-    # ecr_login.set_upstream(nr_install)
+    cli_str = 'sudo curl --silent --location '
+    cli_str = cli_str+'"https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" |'
+    cli_str = cli_str+" tar xz -C /tmp && sudo mv ../../tmp/eksctl ../../usr/local/bin" 
+    install_eksctl = shell_task(command=cli_str, task_args=dict(name='install eksctl',log_stdout=True))
+    # install_eksctl.set_upstream(nr_install)
 
-    ## for some reason, prefect login works from the docker run, but not
-    ## when running connect_prefect.py directly on the ec2
-    # cli_str = 'docker pull 091442718550.dkr.ecr.us-west-1.amazonaws.com/eddp:tag4' 
-    # docker_pull = shell_task(command=cli_str, task_args=dict(name='docker pull',log_stdout=True))
-    # docker_pull.set_upstream(ecr_login)
-
-    # cli_str = 'docker run 091442718550.dkr.ecr.us-west-1.amazonaws.com/eddp:tag4' 
-    # docker_run = shell_task(command=cli_str, task_args=dict(name='docker run',log_stdout=True))
-    # docker_run.set_upstream(docker_pull)
-
-    # cli_str = 'curl -o kubectl https://amazon-eks.s3.us-west-2.amazonaws.com/1.21.2/2021-07-05/bin/linux/amd64/kubectl'
-    # cli_str = cli_str+' && sudo chmod +x ./kubectl'
-    # install_kubectl = shell_task(command=cli_str, task_args=dict(name='install kubectl',log_stdout=True))
-    # # install_kubectl.set_upstream(docker_run)
-
-    # cli_str = 'sudo curl --silent --location '
-    # cli_str = cli_str+'"https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" |'
-    # cli_str = cli_str+" tar xz -C /tmp && sudo mv ../../tmp/eksctl ../../usr/local/bin" 
-    # install_eksctl = shell_task(command=cli_str, task_args=dict(name='install eksctl',log_stdout=True))
-    # install_eksctl.set_upstream(install_kubectl)
-
+    # create eks fargate cluster
     # cli_str = 'eksctl create cluster --name fargate-eks --region us-west-1 --fargate'
     # eks_cluster = shell_task(command=cli_str, task_args=dict(name='create eks cluster',log_stdout=True))
     # eks_cluster.set_upstream(install_eksctl)
-
+    # created eks cluster will be a continually running process so nothing follows it directly in the flow
+    # but wait_for_eks task, in the connect_prefect flow, will discover when that flow is ready to kick-off
+   
 f.run()
+
+

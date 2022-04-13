@@ -1,5 +1,7 @@
 # event-driven-data-processing
-AWS Lambda + Prefect + AWS EKS
+Prefect + AWS EKS
+
+This project automates the deployment of data processing infrastructure using Prefect+AWS EKS, with CircleCI as a CI/CD tool. 
 
 
 for local testing of AWS resoure deploy use (from ./.circleci/ folder)
