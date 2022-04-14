@@ -32,9 +32,9 @@ jobs:
           name: deploy infra
           command: |
             aws cloudformation deploy \ 
-              --template-file ./circleci/aws_resources.yml 
-              --stack-name "eddp-${CIRCLE_WORKFLOW_ID:0:7}" 
-              --parameter-overrides ID="${CIRCLE_WORKFLOW_ID:0:7}" 
+              --template-file ./circleci/aws_resources.yml \
+              --stack-name "eddp-${CIRCLE_WORKFLOW_ID:0:7}" \
+              --parameter-overrides ID="${CIRCLE_WORKFLOW_ID:0:7}" \
               --capabilities CAPABILITY_NAMED_IAM
 
 
