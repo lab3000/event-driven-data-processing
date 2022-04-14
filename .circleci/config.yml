@@ -10,7 +10,7 @@ jobs:
       - run:
           name: install dependencies
           command: |
-            pip install awscli
+            pip install awscli==1.19.84
             pip install black
 
       - run:
@@ -31,6 +31,7 @@ jobs:
       - run:
           name: deploy infra
           command: |
+            aws --version
             aws cloudformation deploy \ 
               --template-file .circleci/aws_resources.yml \
               --stack-name "eddp-${CIRCLE_WORKFLOW_ID:0:7}" \
